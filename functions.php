@@ -18,12 +18,12 @@ function findCssFilesInDocument($document)
 }
 
 /**
- * @param  string  $stylesheet
- * @param  bool    $excludePseudoClasses
+ * @param  string   $stylesheet
+ * @param  string[] $ignore
  *
  * @return string[]
  */
-function findCssRulesInStylesheet($stylesheet, $excludePseudoClasses = TRUE)
+function findCssRulesInStylesheet($stylesheet, $ignore = array())
 {
 	if (!preg_match_all('~(?:^(?!@)|})([^{}]+?){~m', $stylesheet, $matched))
 		return array();
@@ -31,8 +31,18 @@ function findCssRulesInStylesheet($stylesheet, $excludePseudoClasses = TRUE)
 	$return = array();
 
 	foreach ($matched[1] as $match)
-		if (!($excludePseudoClasses && strpos($match, ':') !== FALSE))
+	{
+		$ignoreMatch = FALSE;
+		foreach ($ignore as $ignoreRule)
+			if (strpos($match, $ignoreRule) !== FALSE)
+			{
+				$ignoreMatch = TRUE;
+				break;
+			}
+
+		if (!$ignoreMatch)
 			$return[] = trim($match);
+	}
 
 	return $return;
 }
