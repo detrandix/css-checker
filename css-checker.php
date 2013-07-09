@@ -1,13 +1,11 @@
 #!/usr/bin/php
 <?php
 
-if ($argc != 2 || in_array($argv[1], array('--help', '-help', '-h', '-?'))) {
+if ($argc < 2 || in_array($argv[1], array('--help', '-help', '-h', '-?'))) {
 ?>
 
-This is a command line PHP script with one option.
-
   Usage:
-  <?php echo $argv[0]; ?> url
+  <?php echo $argv[0]; ?> baseUrl [somePage1, somepage2, ...]
 
 <?php
 } else {
@@ -40,13 +38,7 @@ This is a command line PHP script with one option.
 		$rules = array();
 
 		foreach ($stylesheetFiles as &$file)
-		{
-			print "Downloading {$file['url']}... \n";
-
-			$sheet = file_get_contents($file['url']);
-
-			$rules = array_merge($rules, findCssRulesInStylesheet($sheet));
-		}
+			$rules = array_merge($rules, findCssRulesInStylesheet(file_get_contents($file['url'])));
 
 		$rules = array_unique($rules);
 
@@ -57,16 +49,53 @@ This is a command line PHP script with one option.
 			exit;
 		}
 
-		print "Checking rules...\n";
+		print "Checking rules...\n\n";
 
-		$foundRules = findCssRulesInDocument($document, $rules);
+		$totalFoundRules = array();
+		$rulesTotalCount = count($rules);
 
-		$foundRulesTotal = count($rules);
-		$foundRulesCount = count($foundRules);
-		$noFoundRulesCount = $foundRulesTotal - $foundRulesCount;
+		for ($i = 1, $filesCount = count($argv); $i < $filesCount; $i++)
+		{
+			$url = rtrim($baseUrl, '/') . '/' . str_replace($baseUrl, '', $argv[$i]) . '/';
+			$url = rtrim($url, '/') . '/';
 
-		print "  Found: " . $foundRulesCount . " (" . (round(($foundRulesCount/$foundRulesTotal)*100, 2)) . "%)\n";
-		print "  No used: " . $noFoundRulesCount . " (" . (round(($noFoundRulesCount/$foundRulesTotal)*100, 2)) . "%)\n";
+			print "$url\n";
+
+			$foundRules = findCssRulesInDocument(file_get_contents($url), $rules);
+
+
+			$foundRulesCount = count($foundRules);
+			$noFoundRulesCount = $rulesTotalCount - $foundRulesCount;
+
+			print "  Found: " . $foundRulesCount . " (" . (round(($foundRulesCount/$rulesTotalCount)*100, 2)) . "%)\n";
+			print "  No used: " . $noFoundRulesCount . " (" . (round(($noFoundRulesCount/$rulesTotalCount)*100, 2)) . "%)\n";
+
+			$totalFoundRules = array_unique(array_merge($totalFoundRules, $foundRules));
+		}
+
+		print "\n-----------------\n\n";
+
+		$totalFoundRulesCount = count($totalFoundRules);
+		$totalNoFoundRulesCount = $rulesTotalCount - $totalFoundRulesCount;
+
+		print "Found: " . $totalFoundRulesCount . " (" . (round(($totalFoundRulesCount/$rulesTotalCount)*100, 2)) . "%)\n";
+		print "No used: " . $totalNoFoundRulesCount . " (" . (round(($totalNoFoundRulesCount/$rulesTotalCount)*100, 2)) . "%)\n";
+
+		if ($totalNoFoundRulesCount > 0)
+		{
+			$handle = fopen('no-found-css-rules.txt', 'w');
+
+			$totalNoFoundRules = array_diff($rules, $totalFoundRules);
+
+			foreach ($totalNoFoundRules as $rule)
+			{
+				fwrite($handle, $rule . "\n");
+			}
+
+			fclose($handle);
+
+			print "\nRules saved in no-found-css-rules.txt\n";
+		}
 	} else
 	{
 		print "\nNo found linked stylesheets.\n";
