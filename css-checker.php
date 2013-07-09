@@ -11,7 +11,7 @@ This is a command line PHP script with one option.
 
 <?php
 } else {
-	require_once dirname('.') . '/DomQuery.php';
+	require_once dirname('.') . '/functions.php';
 
 	$baseUrl = $argv[1];
 
@@ -21,16 +21,18 @@ This is a command line PHP script with one option.
 
 	print "[OK]\n";
 
-	if (($count = preg_match_all('~<link.+?href=[\'"](.+\.css.*)[\'"].*?>~', $document, $matched)))
+	$foundStylesheetFiles = findCssFilesInDocument($document);
+
+	if (($count = count($foundStylesheetFiles)) > 0)
 	{
 		print "  Found stylesheets: {$count}\n";
 
 		$stylesheetFiles = array();
 
-		foreach ($matched[1] as $match)
+		foreach ($foundStylesheetFiles as $file)
 		{
-			print "    {$match}\n";
-			$stylesheetFiles[] = array('url' => rtrim($baseUrl, '/') . $match);
+			print "    {$file}\n";
+			$stylesheetFiles[] = array('url' => rtrim($baseUrl, '/') . $file);
 		}
 
 		print "\n";
@@ -39,32 +41,11 @@ This is a command line PHP script with one option.
 
 		foreach ($stylesheetFiles as &$file)
 		{
-			print "Downloading {$file['url']}... ";
+			print "Downloading {$file['url']}... \n";
 
 			$sheet = file_get_contents($file['url']);
 
-			print "[OK]\n";
-
-			$file['document'] = $sheet;
-			$file['rules'] = array();
-
-			if (($countRules = preg_match_all('~(?:^|})(.+?){~m', $sheet, $rulesMatched)))
-			{
-				print "  Found CSS rules: {$countRules}\n";
-
-				foreach ($rulesMatched[1] as $ruleMatched)
-					foreach (explode(',', $ruleMatched) as $rule)
-						if (strpos($rule, ':') === FALSE)
-						{
-							$file['rules'][] = trim($rule);
-							$rules[] = trim($rule);
-						}
-
-				print "  Found CSS rules without pseudo classes: " . count($file['rules']) . "\n";
-			} else
-				print "  No CSS rules in this file";
-
-			print "\n";
+			$rules = array_merge($rules, findCssRulesInStylesheet($sheet));
 		}
 
 		$rules = array_unique($rules);
@@ -78,29 +59,14 @@ This is a command line PHP script with one option.
 
 		print "Checking rules...\n";
 
-		libxml_use_internal_errors(true); // solution for HMTL 5 tags
-		$domQueryDocument = Tester\DomQuery::fromHtml($document);
-		libxml_clear_errors();
+		$foundRules = findCssRulesInDocument($document, $rules);
 
-		$foundRules = array();
-		$noFoundRules = array();
+		$foundRulesTotal = count($rules);
+		$foundRulesCount = count($foundRules);
+		$noFoundRulesCount = $foundRulesTotal - $foundRulesCount;
 
-		foreach ($rules as $rule)
-		{
-			try
-			{
-				if ($domQueryDocument->has($rule))
-					$foundRules[] = $rule;
-				else
-					$noFoundRules[] = $rule;
-			} catch (\Exception $e)
-			{
-				$noFoundRules[] = $rule;
-			}
-		}
-
-		print "  Found: " . count($foundRules) . " (" . (round((count($foundRules)/count($rules))*100, 2)) . "%)\n";
-		print "  No found: " . count($noFoundRules) . " (" . (round((count($noFoundRules)/count($rules))*100, 2)) . "%)\n";
+		print "  Found: " . $foundRulesCount . " (" . (round(($foundRulesCount/$foundRulesTotal)*100, 2)) . "%)\n";
+		print "  No used: " . $noFoundRulesCount . " (" . (round(($noFoundRulesCount/$foundRulesTotal)*100, 2)) . "%)\n";
 	} else
 	{
 		print "\nNo found linked stylesheets.\n";
