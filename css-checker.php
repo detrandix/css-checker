@@ -1,14 +1,20 @@
 #!/usr/bin/php
 <?php
 
-$options = getopt("u:p:i:h");
+$options = getopt("u:p:i:h", array(
+	"pages-file:",
+	"ignore-file:"
+));
 
 if (!array_key_exists('u', $options) || array_key_exists('h', $options))
 {
 	print <<<DOC
 Usage: {$argv[0]} -u <url to check> [options]
 
-  -p <page> Add page to check (can be used multiple times)
+  -p <page>            Add page to check (can be used multiple times)
+  -i <term>            Ignore CSS rules with <term> within
+  --pages-file <path>  Load pages from file separated by new line
+  --ignore-file <path> Load ignore CSS rules separated by new line
 
 DOC;
 
@@ -45,7 +51,17 @@ if (($count = count($foundStylesheetFiles)) > 0)
 
 	$ignore = array(':');
 	if (array_key_exists('i', $options))
-		$ignore = array_merge($ignore, (array) $options['i']);
+		$ignore = array_unique(array_merge($ignore, (array) $options['i']));
+	if (array_key_exists('ignore-file', $options))
+	{
+		foreach ((array) $options['ignore-file'] as $path)
+		{
+			$lines = parseLineFile(file_get_contents($path));
+
+			if (count($lines))
+				$ignore = array_unique(array_merge($ignore, $lines));
+		}
+	}
 
 	foreach ($stylesheetFiles as &$file)
 		$rules = array_merge($rules, findCssRulesInStylesheet(file_get_contents($file['url']), $ignore));
@@ -66,7 +82,17 @@ if (($count = count($foundStylesheetFiles)) > 0)
 
 	$pages = array($baseUrl);
 	if (array_key_exists('p', $options))
-		$pages = array_merge($pages, (array) $options['p']);
+		$pages = array_unique(array_merge($pages, (array) $options['p']));
+	if (array_key_exists('pages-file', $options))
+	{
+		foreach ((array) $options['pages-file'] as $path)
+		{
+			$lines = parseLineFile(file_get_contents($path));
+
+			if (count($lines))
+				$pages = array_unique(array_merge($pages, $lines));
+		}
+	}
 
 	foreach ($pages as $page)
 	{

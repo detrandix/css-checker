@@ -74,3 +74,20 @@ function findCssRulesInDocument($document, $rules)
 
 	return $foundRules;
 }
+
+function parseLineFile($file)
+{
+	$lines = preg_split('/\r|\n/', $file);
+
+	$return = array();
+
+	foreach ($lines as $line)
+	{
+		$trimLine = trim($line);
+
+		if (strlen($trimLine))
+			$return[] = $trimLine;
+	}
+
+	return $return;
+}
